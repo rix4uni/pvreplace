@@ -15,6 +15,13 @@ wget -O bhedak https://raw.githubusercontent.com/rix4uni/pvreplace/main/pvreplac
 ```
 
 ## Usage
+```
+Usage: python3 pvreplace.py [string] [-without-encode]
+Arguments:
+  [string]           The string to be encoded and replaced in URLs
+  -without-encode    Optional argument to disable URL encoding (default: enabled)
+```
+
 ### Example input file:
 ```
 ▶ cat urls.txt
