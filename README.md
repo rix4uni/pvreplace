@@ -9,11 +9,6 @@ You can install arjun with pip as following:
 pip3 install pvreplace
 ```
 
-or, by downloading this repository and running
-```
-wget -O bhedak https://raw.githubusercontent.com/rix4uni/pvreplace/main/pvreplace.py -q && chmod +x pvreplace && mv pvreplace /usr/bin/
-```
-
 ## Usage
 ```
 Usage: python3 pvreplace.py [string] [-without-encode]
