@@ -4,9 +4,10 @@ Accept URLs on stdin, replace all query string values with a user-supplied value
 each combination of query string parameters once per host and path.
 
 ## Installation
-You can install arjun with pip as following:
 ```
-pip3 install pvreplace
+https://github.com/rix4uni/pvreplace.git
+cd pvreplace
+pip3 install -r requirements.txt
 ```
 
 ## Usage
