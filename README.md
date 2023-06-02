@@ -5,14 +5,13 @@ each combination of query string parameters once per host and path.
 
 ## Installation
 ```
-https://github.com/rix4uni/pvreplace.git
-cd pvreplace
-pip3 install -r requirements.txt
+git clone https://github.com/rix4uni/pvreplace.git ~/bin/pvreplace
+echo "alias pvreplace='python3 ~/bin/pvreplace/pvreplace.py'" >> ~/.bashrc && source ~/.bashrc
 ```
 
 ## Usage
 ```
-Usage: python3 pvreplace.py [string] [-without-encode]
+Usage: pvreplace [string] [-without-encode]
 Arguments:
   [string]           The string to be encoded and replaced in URLs
   -without-encode    Optional argument to disable URL encoding (default: enabled)
