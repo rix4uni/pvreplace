@@ -4,34 +4,33 @@ from sys import stdin, stdout, argv, exit
 
 # Check if the "-without-encode" argument is provided
 encode = True
-if len(argv) > 2 and argv[2] == "-without-encode":
+if "-without-encode" in argv:
     encode = False
 
 # Check if help argument is provided
 if len(argv) > 1 and (argv[1] == "-h" or argv[1] == "--help"):
     print("Usage: python3 pvreplace.py [string] [-without-encode]")
     print("Arguments:")
-    print("  [string]           The string to be encoded and replaced in URLs")
+    print("  [string]           The string(s) to be replaced in URLs")
     print("  -without-encode    Optional argument to disable URL encoding (default: enabled)")
     exit(0)
 
 try:
-    encoded = ul.quote(str(argv[1]), safe='') if encode else str(argv[1])
-except IndexError:
-    encoded = ul.quote("FUZZ", safe='')
+    strings_arg = argv[1] if len(argv) > 1 else "FUZZ"
+    strings = [s.strip() for s in strings_arg.split(",")]
 
-try:
-    unique_urls = set()  # Set to store unique URLs
+    encoded_strings = []
+    for string in strings:
+        encoded_strings.append(ul.quote(str(string), safe='') if encode else str(string))
 
     for url in stdin.readlines():
         domain = str(url.strip())
-        modified_url = re.sub(r"=[^?\|&]*", '=' + str(encoded), str(domain))
-        unique_urls.add(modified_url)  # Add modified URL to the set
+        for encoded in encoded_strings:
+            modified_url = re.sub(r"=[^?\|&]*", '=' + str(encoded), domain)
+            stdout.write(modified_url + '\n')
 
-    # Print unique URLs
-    for url in unique_urls:
-        stdout.write(url + '\n')
 except KeyboardInterrupt:
     exit(0)
-except:
+except Exception as e:
+    print("Error:", e)
     exit(127)
