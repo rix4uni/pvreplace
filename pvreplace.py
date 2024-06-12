@@ -14,7 +14,7 @@ def print_help():
     print("  -path-param        Modifying the path and adding a parameter")
     print("  -ext-filename      Replacing the filenames")
     print("  -without-encode    Prints URLs without encode the payload")
-    print("  -single-replace    Replacing one By one")
+    print("  -single-replace    Replacing one By one parameter value")
     print("  -v, --version      Prints current version")
     print("  -h, --help         Prints Help")
     exit(0)
