@@ -11,10 +11,20 @@ echo "alias pvreplace='python3 ~/bin/pvreplace/pvreplace.py'" >> ~/.bashrc && so
 
 ## Usage
 ```
-Usage: pvreplace [string] [-without-encode]
+Usage: python3 pvreplace.py [string] [-without-encode] [-flags]
 Arguments:
-  [string]           The string to be encoded and replaced in URLs
+  [string]           The string(s) to be replaced in URLs (default: FUZZ)
   -without-encode    Optional argument to disable URL encoding (default: enabled)
+  -flags             Additional flags for URL modification patterns
+  -param-value       Replacing parameter values
+  -param-name        Replacing parameter names
+  -path-suffix       Adding a suffix to the path
+  -path-param        Modifying the path and adding a parameter
+  -ext-filename      Replacing the filenames
+  -without-encode    Prints URLs without encode the payload
+  -single-replace    Replacing one By one
+  -v, --version      Prints current version
+  -h, --help         Prints Help
 ```
 
 ### Example input file:
