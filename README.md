@@ -34,6 +34,7 @@ https://example.com/path?one=1&two=2
 https://example.com/path?two=2&one=1
 https://example.com/pathtwo?two=2&one=1
 https://example.net/a/path?two=2&one=1
+http://testphp.vulnweb.com/artists.php?artist=1&id=2
 ```
 
 ### If you not passed any `payload` by default replace with `FUZZ`
