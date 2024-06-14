@@ -3,25 +3,24 @@ import urllib.parse as ul
 from sys import stdin, stdout, argv, exit
 
 def print_help():
-    print("Usage: python3 pvreplace.py [string] [-without-encode] [-flags]")
-    print("Arguments:")
-    print("  [string]           The string(s) to be replaced in URLs (default: FUZZ)")
+    print("Usage: python3 pvreplace.py [strings] [-without-encode] [-part] [-type] [-mode] [-payload [strings or filepath]]")
+    print("\npositional arguments:")
+    print("  strings             The string(s) to be replaced in URLs (default: FUZZ)")
+    print("\noptions:")
     print("  -without-encode    Optional argument to disable URL encoding (default: enabled)")
-    print("  -flags             Additional flags for URL modification patterns")
-    print("  -param-value       Replacing parameter values")
-    print("  -param-name        Replacing parameter names")
-    print("  -path-suffix       Adding a suffix to the path")
-    print("  -path-param        Modifying the path and adding a parameter")
-    print("  -ext-filename      Replacing the filenames")
-    print("  -without-encode    Prints URLs without encode the payload")
-    print("  -single-replace    Replacing one By one parameter value")
+    print("  -part              Specify which part of the URL to modify Options: param-value, param-name, path-suffix, path-param, ext-filename (default: param-value)")
+    print("  -type              Specify the type of modification Options: replace, prefix, postfix (default: replace)")
+    print("  -mode              Specify the mode of replacement Options: multiple, single (default: multiple)")
+    print("  -payload           Specify payload(s) directly or from a file")
     print("  -v, --version      Prints current version")
     print("  -h, --help         Prints Help")
     exit(0)
 
 def parse_args():
     encode = True
-    flags = []
+    part = "param-value"
+    replace_type = "replace"
+    mode = "multiple"
     strings_arg = "FUZZ"
 
     if "-h" in argv or "--help" in argv:
@@ -34,63 +33,138 @@ def parse_args():
     if "-without-encode" in argv:
         encode = False
     
+    payload_flag = False
+    payload_file = False
+
     for arg in argv[1:]:
-        if arg not in ["-without-encode", "-param-value", "-param-name", "-path-suffix", "-path-param", "-ext-filename", "-single-replace"]:
+        if arg == "-without-encode":
+            encode = False
+        elif arg == "-part":
+            part_index = argv.index(arg) + 1
+            if part_index < len(argv):
+                part = argv[part_index]
+        elif arg == "-type":
+            type_index = argv.index(arg) + 1
+            if type_index < len(argv):
+                replace_type = argv[type_index]
+        elif arg == "-mode":
+            mode_index = argv.index(arg) + 1
+            if mode_index < len(argv):
+                mode = argv[mode_index]
+        elif arg == "-payload":
+            payload_flag = True
+            payload_index = argv.index(arg) + 1
+            if payload_index < len(argv):
+                strings_arg = argv[payload_index]
+                if strings_arg.endswith(".txt"):
+                    payload_file = True
+        elif arg not in ["-without-encode", "-part", part, "-type", replace_type, "-mode", mode, "-payload"]:
             strings_arg = arg
-        if arg in ["-param-value", "-param-name", "-path-suffix", "-path-param", "-ext-filename", "-single-replace"]:
-            flags.append(arg)
 
-    return strings_arg, encode, flags
+    if payload_flag and payload_file:
+        with open(strings_arg, 'r') as file:
+            strings_arg = file.read().strip().replace("\n", ",")
 
-def modify_url(url, encoded_strings, flags):
+    return strings_arg, encode, part, replace_type, mode
+
+def modify_url(url, encoded_strings, part, replace_type, mode):
     domain = url.strip()
     modified_urls = []
 
     for encoded in encoded_strings:
-        if "-param-value" in flags:
-            if "-single-replace" in flags:
+        if part == "param-value":
+            if mode == "single":
                 params = re.findall(r"=[^&]*", domain)
                 for param in params:
-                    modified_urls.append(domain.replace(param, f"={encoded}", 1))
+                    if replace_type == "replace":
+                        modified_urls.append(domain.replace(param, f"={encoded}", 1))
+                    elif replace_type == "prefix":
+                        modified_urls.append(domain.replace(param, f"={encoded}{param[1:]}", 1))
+                    elif replace_type == "postfix":
+                        modified_urls.append(domain.replace(param, f"={param[1:]}{encoded}", 1))
             else:
-                modified_urls.append(re.sub(r"=([^&]*)", f"={encoded}", domain))
-        if "-param-name" in flags:
-            if "-single-replace" in flags:
+                if replace_type == "replace":
+                    modified_urls.append(re.sub(r"=([^&]*)", f"={encoded}", domain))
+                elif replace_type == "prefix":
+                    modified_urls.append(re.sub(r"=([^&]*)", f"={encoded}\\1", domain))
+                elif replace_type == "postfix":
+                    modified_urls.append(re.sub(r"=([^&]*)", f"=\\1{encoded}", domain))
+        elif part == "param-name":
+            if mode == "single":
                 params = re.findall(r"([?&])([^&=]+)=", domain)
                 for param, name in params:
-                    modified_urls.append(domain.replace(f"{param}{name}=", f"{param}{encoded}="))
+                    if replace_type == "replace":
+                        modified_urls.append(domain.replace(f"{param}{name}=", f"{param}{encoded}=", 1))
+                    elif replace_type == "prefix":
+                        modified_urls.append(domain.replace(f"{param}{name}=", f"{param}{encoded}{name}=", 1))
+                    elif replace_type == "postfix":
+                        modified_urls.append(domain.replace(f"{param}{name}=", f"{param}{name}{encoded}=", 1))
             else:
                 def replace_param_name(match):
-                    return match.group(1) + encoded + "="
+                    if replace_type == "replace":
+                        return match.group(1) + encoded + "="
+                    elif replace_type == "prefix":
+                        return match.group(1) + encoded + match.group(2) + "="
+                    elif replace_type == "postfix":
+                        return match.group(1) + match.group(2) + encoded + "="
                 modified_urls.append(re.sub(r"([?&])([^&=]+)=", replace_param_name, domain))
-        if "-path-suffix" in flags:
+        elif part == "path-suffix":
             if "?" in domain:
                 base, params = domain.split("?", 1)
-                modified_urls.append(f"{base}/{encoded}?{params}")
+                if replace_type == "replace":
+                    modified_urls.append(f"{base}/{encoded}?{params}")
+                elif replace_type == "prefix":
+                    modified_urls.append(f"{base}/{encoded}{base.split('/')[-1]}?{params}")
+                elif replace_type == "postfix":
+                    modified_urls.append(f"{base}/{base.split('/')[-1]}{encoded}?{params}")
             else:
-                modified_urls.append(domain + '/' + encoded)
-        if "-path-param" in flags:
+                if replace_type == "replace":
+                    modified_urls.append(domain + '/' + encoded)
+                elif replace_type == "prefix":
+                    modified_urls.append(domain + '/' + encoded + domain.split('/')[-1])
+                elif replace_type == "postfix":
+                    modified_urls.append(domain + '/' + domain.split('/')[-1] + encoded)
+        elif part == "path-param":
             if "?" in domain:
                 base, params = domain.split("?", 1)
-                modified_urls.append(f"{base}/{encoded}?{params}")
-                modified_urls.append(f"{base}?{encoded}&{params}")
+                if replace_type == "replace":
+                    modified_urls.append(f"{base}/{encoded}?{params}")
+                    modified_urls.append(f"{base}?{encoded}&{params}")
+                elif replace_type == "prefix":
+                    modified_urls.append(f"{base}/{encoded}{base.split('/')[-1]}?{params}")
+                    modified_urls.append(f"{base}?{encoded}{base.split('/')[-1]}&{params}")
+                elif replace_type == "postfix":
+                    modified_urls.append(f"{base}/{base.split('/')[-1]}{encoded}?{params}")
+                    modified_urls.append(f"{base}?{base.split('/')[-1]}{encoded}&{params}")
             else:
-                modified_urls.append(domain + '/' + encoded)
-                modified_urls.append(domain + '?' + encoded)
-        if "-ext-filename" in flags:
-            modified_urls.append(re.sub(r"/([^/]+)\.(php|aspx|asp|jsp|jspx|xml)", f"/{encoded}.\\2", domain))
+                if replace_type == "replace":
+                    modified_urls.append(domain + '/' + encoded)
+                    modified_urls.append(domain + '?' + encoded)
+                elif replace_type == "prefix":
+                    modified_urls.append(domain + '/' + encoded + domain.split('/')[-1])
+                    modified_urls.append(domain + '?' + encoded + domain.split('/')[-1])
+                elif replace_type == "postfix":
+                    modified_urls.append(domain + '/' + domain.split('/')[-1] + encoded)
+                    modified_urls.append(domain + '?' + domain.split('/')[-1] + encoded)
+        elif part == "ext-filename":
+            if replace_type == "replace":
+                modified_urls.append(re.sub(r"/([^/]+)\.(php|aspx|asp|jsp|jspx|xml)", f"/{encoded}.\\2", domain))
+            elif replace_type == "prefix":
+                modified_urls.append(re.sub(r"/([^/]+)\.(php|aspx|asp|jsp|jspx|xml)", f"/{encoded}\\1.\\2", domain))
+            elif replace_type == "postfix":
+                modified_urls.append(re.sub(r"/([^/]+)\.(php|aspx|asp|jsp|jspx|xml)", f"/\\1{encoded}.\\2", domain))
 
     return modified_urls
 
 def main():
-    strings_arg, encode, flags = parse_args()
+    strings_arg, encode, part, replace_type, mode = parse_args()
     strings = [s.strip() for s in strings_arg.split(",")]
 
     encoded_strings = [ul.quote(str(string), safe='') if encode else str(string) for string in strings]
 
     try:
         for url in stdin.readlines():
-            modified_urls = modify_url(url, encoded_strings, flags)
+            modified_urls = modify_url(url, encoded_strings, part, replace_type, mode)
             for modified_url in modified_urls:
                 stdout.write(modified_url + '\n')
 
