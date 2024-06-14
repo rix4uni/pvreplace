@@ -17,162 +17,91 @@ positional arguments:
   strings             The string(s) to be replaced in URLs (default: FUZZ)
 
 options:
-  -without-encode    Optional argument to disable URL encoding (default: enabled)
   -part              Specify which part of the URL to modify Options: param-value, param-name, path-suffix, path-param, ext-filename (default: param-value)
   -type              Specify the type of modification Options: replace, prefix, postfix (default: replace)
   -mode              Specify the mode of replacement Options: multiple, single (default: multiple)
   -payload           Specify payload(s) directly or from a file
+  -without-encode    Optional argument to disable URL encoding (default: enabled)
   -v, --version      Prints current version
   -h, --help         Prints Help
 ```
 
-### Example input file:
+## Part
+`param-value (default) - fuzz param-value for URL`
 ```
-▶ cat urls.txt
-https://example.com/path?one=1&two=2
-https://example.com/path?two=2&one=1
-https://example.com/pathtwo?two=2&one=1
-https://example.net/a/path?two=2&one=1
-http://testphp.vulnweb.com/artists.php?artist=1&id=2
-```
-
-### If you not passed any `payload` by default replace with `FUZZ`
-```
-▶ cat urls.txt | pvreplace -param-value
-https://example.com/path?one=FUZZ&two=FUZZ
-https://example.com/path?two=FUZZ&one=FUZZ
-https://example.com/pathtwo?two=FUZZ&one=FUZZ
-https://example.net/a/path?two=FUZZ&one=FUZZ
+▶ echo "http://testphp.vulnweb.com/artists.php?artist=1&id=2" | pvreplace -part param-value
 http://testphp.vulnweb.com/artists.php?artist=FUZZ&id=FUZZ
 ```
 
-### Replacing one By one parameter value
+`param-name - fuzz param-name for URL`
 ```
-▶ cat urls.txt | pvreplace -param-value -single-replace
-https://example.com/path?one=FUZZ&two=2
-https://example.com/path?one=1&two=FUZZ
-https://example.com/path?two=FUZZ&one=1
-https://example.com/path?two=2&one=FUZZ
-https://example.com/pathtwo?two=FUZZ&one=1
-https://example.com/pathtwo?two=2&one=FUZZ
-https://example.net/a/path?two=FUZZ&one=1
-https://example.net/a/path?two=2&one=FUZZ
+▶ echo "http://testphp.vulnweb.com/artists.php?artist=1&id=2" | pvreplace -part param-name
+http://testphp.vulnweb.com/artists.php?FUZZ=1&FUZZ=2
+```
+
+`path-suffix - fuzz path-suffix for URL`
+```
+▶ echo "http://testphp.vulnweb.com/artists.php?artist=1&id=2" | pvreplace -part path-suffix
+http://testphp.vulnweb.com/artists.php/FUZZ?artist=1&id=2
+```
+
+`path-param - fuzz path-param for URL`
+```
+▶ echo "http://testphp.vulnweb.com/artists.php?artist=1&id=2" | pvreplace -part path-param
+http://testphp.vulnweb.com/artists.php/FUZZ?artist=1&id=2
+http://testphp.vulnweb.com/artists.php?FUZZ&artist=1&id=2
+```
+
+`ext-filename - fuzz ext-filename for URL`
+```
+▶ echo "http://testphp.vulnweb.com/artists.php?artist=1&id=2" | pvreplace -part ext-filename
+http://testphp.vulnweb.com/FUZZ.php?artist=1&id=2
+```
+
+## Type
+`replace (default) - replace the value with payload`
+```
+▶ echo "http://testphp.vulnweb.com/artists.php?artist=1&id=2" | pvreplace -type replace
+http://testphp.vulnweb.com/artists.php?artist=FUZZ&id=FUZZ
+```
+
+`prefix - prefix the value with payload`
+```
+▶ echo "http://testphp.vulnweb.com/artists.php?artist=1&id=2" | pvreplace -type prefix
+http://testphp.vulnweb.com/artists.php?artist=FUZZ1&id=FUZZ2
+```
+
+`postfix - postfix the value with payload`
+```
+▶ echo "http://testphp.vulnweb.com/artists.php?artist=1&id=2" | pvreplace -type postfix
+http://testphp.vulnweb.com/artists.php?artist=1FUZZ&id=2FUZZ
+```
+
+## Mode
+`multiple (default) - replace all values at once`
+```
+▶ echo "http://testphp.vulnweb.com/artists.php?artist=1&id=2" | pvreplace -mode multiple
+http://testphp.vulnweb.com/artists.php?artist=FUZZ&id=FUZZ
+```
+
+`single - replace one value at a time`
+```
+▶ echo "http://testphp.vulnweb.com/artists.php?artist=1&id=2" | pvreplace -mode single
 http://testphp.vulnweb.com/artists.php?artist=FUZZ&id=2
 http://testphp.vulnweb.com/artists.php?artist=1&id=FUZZ
 ```
 
-### Replace query string with custom payloads
+## Payload without encode
 ```
-▶ cat urls.txt | pvreplace "<script>alert(1)</script>" -param-value
-https://example.com/path?one=%3Cscript%3Ealert%281%29%3C%2Fscript%3E&two=%3Cscript%3Ealert%281%29%3C%2Fscript%3E
-https://example.com/path?two=%3Cscript%3Ealert%281%29%3C%2Fscript%3E&one=%3Cscript%3Ealert%281%29%3C%2Fscript%3E
-https://example.com/pathtwo?two=%3Cscript%3Ealert%281%29%3C%2Fscript%3E&one=%3Cscript%3Ealert%281%29%3C%2Fscript%3E
-https://example.net/a/path?two=%3Cscript%3Ealert%281%29%3C%2Fscript%3E&one=%3Cscript%3Ealert%281%29%3C%2Fscript%3E
-http://testphp.vulnweb.com/artists.php?artist=%3Cscript%3Ealert%281%29%3C%2Fscript%3E&id=%3Cscript%3Ealert%281%29%3C%2Fscript%3E
-```
-
-### Replace query string with custom payloads and without encode the payload
-```
-▶ cat urls.txt | pvreplace "<script>alert(1)</script>" -param-value -without-encode
-https://example.com/path?one=<script>alert(1)</script>&two=<script>alert(1)</script>
-https://example.com/path?two=<script>alert(1)</script>&one=<script>alert(1)</script>
-https://example.com/pathtwo?two=<script>alert(1)</script>&one=<script>alert(1)</script>
-https://example.net/a/path?two=<script>alert(1)</script>&one=<script>alert(1)</script>
-http://testphp.vulnweb.com/artists.php?artist=<script>alert(1)</script>&id=<script>alert(1)</script>
-```
-
-### Replace multiple payloads separated by commas
-```
-# urls.txt file content
-▶ cat urls.txt
-https://example.com/path?one=1&two=2
-https://example.com/path?two=2&one=1
-https://example.com/pathtwo?two=2&one=1
-https://example.net/a/path?two=2&one=1
-http://testphp.vulnweb.com/artists.php?artist=1&id=2
-http://testphp.vulnweb.com/listproducts.php?artist=dfgsdftgerer
-http://testphp.vulnweb.com/listproducts.php?artist=dfgsdftgerer&asdf=yry4tytr&cat=fgfgh
-
-
-# without encode
-▶ cat urls.txt | pvreplace '"><script>confirm(1)</script>, "<image/src/onerror=confirm(1)>' -param-value -without-encode
-https://example.com/path?one="><script>confirm(1)</script>&two="><script>confirm(1)</script>
-https://example.com/path?one="<image/src/onerror=confirm(1)>&two="<image/src/onerror=confirm(1)>
-https://example.com/path?two="><script>confirm(1)</script>&one="><script>confirm(1)</script>
-https://example.com/path?two="<image/src/onerror=confirm(1)>&one="<image/src/onerror=confirm(1)>
-https://example.com/pathtwo?two="><script>confirm(1)</script>&one="><script>confirm(1)</script>
-https://example.com/pathtwo?two="<image/src/onerror=confirm(1)>&one="<image/src/onerror=confirm(1)>
-https://example.net/a/path?two="><script>confirm(1)</script>&one="><script>confirm(1)</script>
-https://example.net/a/path?two="<image/src/onerror=confirm(1)>&one="<image/src/onerror=confirm(1)>
+▶ echo "http://testphp.vulnweb.com/artists.php?artist=1&id=2" | pvreplace -payload '"><script>confirm(1)</script>, "<image/src/onerror=confirm(1)>' -without-encode
 http://testphp.vulnweb.com/artists.php?artist="><script>confirm(1)</script>&id="><script>confirm(1)</script>
 http://testphp.vulnweb.com/artists.php?artist="<image/src/onerror=confirm(1)>&id="<image/src/onerror=confirm(1)>
-http://testphp.vulnweb.com/listproducts.php?artist="><script>confirm(1)</script>
-http://testphp.vulnweb.com/listproducts.php?artist="<image/src/onerror=confirm(1)>
-http://testphp.vulnweb.com/listproducts.php?artist="><script>confirm(1)</script>&asdf="><script>confirm(1)</script>&cat="><script>confirm(1)</script>
-http://testphp.vulnweb.com/listproducts.php?artist="<image/src/onerror=confirm(1)>&asdf="<image/src/onerror=confirm(1)>&cat="<image/src/onerror=confirm(1)>
 
-# without encode with one by one parameter value replace
-▶ cat urls.txt | pvreplace '"><script>confirm(1)</script>, "<image/src/onerror=confirm(1)>' -param-value -without-encode -single-replace
-https://example.com/path?one="><script>confirm(1)</script>&two=2
-https://example.com/path?one=1&two="><script>confirm(1)</script>
-https://example.com/path?one="<image/src/onerror=confirm(1)>&two=2
-https://example.com/path?one=1&two="<image/src/onerror=confirm(1)>
-https://example.com/path?two="><script>confirm(1)</script>&one=1
-https://example.com/path?two=2&one="><script>confirm(1)</script>
-https://example.com/path?two="<image/src/onerror=confirm(1)>&one=1
-https://example.com/path?two=2&one="<image/src/onerror=confirm(1)>
-https://example.com/pathtwo?two="><script>confirm(1)</script>&one=1
-https://example.com/pathtwo?two=2&one="><script>confirm(1)</script>
-https://example.com/pathtwo?two="<image/src/onerror=confirm(1)>&one=1
-https://example.com/pathtwo?two=2&one="<image/src/onerror=confirm(1)>
-https://example.net/a/path?two="><script>confirm(1)</script>&one=1
-https://example.net/a/path?two=2&one="><script>confirm(1)</script>
-https://example.net/a/path?two="<image/src/onerror=confirm(1)>&one=1
-https://example.net/a/path?two=2&one="<image/src/onerror=confirm(1)>
-http://testphp.vulnweb.com/artists.php?artist="><script>confirm(1)</script>&id=2
-http://testphp.vulnweb.com/artists.php?artist=1&id="><script>confirm(1)</script>
-http://testphp.vulnweb.com/artists.php?artist="<image/src/onerror=confirm(1)>&id=2
-http://testphp.vulnweb.com/artists.php?artist=1&id="<image/src/onerror=confirm(1)>
-http://testphp.vulnweb.com/listproducts.php?artist="><script>confirm(1)</script>
-http://testphp.vulnweb.com/listproducts.php?artist="<image/src/onerror=confirm(1)>
-http://testphp.vulnweb.com/listproducts.php?artist="><script>confirm(1)</script>&asdf=yry4tytr&cat=fgfgh
-http://testphp.vulnweb.com/listproducts.php?artist=dfgsdftgerer&asdf="><script>confirm(1)</script>&cat=fgfgh
-http://testphp.vulnweb.com/listproducts.php?artist=dfgsdftgerer&asdf=yry4tytr&cat="><script>confirm(1)</script>
-http://testphp.vulnweb.com/listproducts.php?artist="<image/src/onerror=confirm(1)>&asdf=yry4tytr&cat=fgfgh
-http://testphp.vulnweb.com/listproducts.php?artist=dfgsdftgerer&asdf="<image/src/onerror=confirm(1)>&cat=fgfgh
-http://testphp.vulnweb.com/listproducts.php?artist=dfgsdftgerer&asdf=yry4tytr&cat="<image/src/onerror=confirm(1)>
-```
+or
 
-### Other flags
-```
-# Test replacing all parameter names with a specific string
-echo "http://testphp.vulnweb.com/artists.php?artist=1&id=2" | python3 pvreplace -param-name "456"
-http://testphp.vulnweb.com/artists.php?456=1&456=2
-
-echo "http://testphp.vulnweb.com/artists.php?artist=1&id=2" | python3 pvreplace -param-name "456" -single-replace
-# Expected output: http://testphp.vulnweb.com/artists.php?456=1&id=2
-# Expected output: http://testphp.vulnweb.com/artists.php?artist=1&456=2
-
-# Test replacing parameter values
-echo "http://testphp.vulnweb.com/artists.php?artist=1&id=2" | python3 pvreplace -param-value
-http://testphp.vulnweb.com/artists.php?artist=456&id=456
-
-echo "http://testphp.vulnweb.com/artists.php?artist=1&id=2" | python3 pvreplace -param-value -single-replace
-# Expected output: http://testphp.vulnweb.com/artists.php?artist=FUZZ&id=2
-# Expected output: http://testphp.vulnweb.com/artists.php?artist=1&id=FUZZ
-
-# Test adding a suffix to the path
-echo "http://testphp.vulnweb.com/artists.php?artist=1&id=2" | python3 pvreplace -path-suffix
-# Expected output: http://testphp.vulnweb.com/artists.php/FUZZ?artist=1&id=2
-
-# Test modifying the path and adding a parameter
-echo "http://testphp.vulnweb.com/artists.php?artist=1&id=2" | python3 pvreplace -path-param
-# Expected output: http://testphp.vulnweb.com/artists.php/FUZZ?artist=1&id=2
-# Another possible output: http://testphp.vulnweb.com/artists.php?FUZZ&artist=1&id=2
-
-# Test replacing the filename with FUZZ
-echo "http://testphp.vulnweb.com/artists.php?artist=1&id=2" | python3 pvreplace -ext-filename
-# Expected output: http://testphp.vulnweb.com/FUZZ.php?artist=1&id=2
+▶ echo "http://testphp.vulnweb.com/artists.php?artist=1&id=2" | pvreplace -payload payloads.txt -without-encode
+http://testphp.vulnweb.com/artists.php?artist="><script>confirm(1)</script>&id="><script>confirm(1)</script>
+http://testphp.vulnweb.com/artists.php?artist="<image/src/onerror=confirm(1)>&id="<image/src/onerror=confirm(1)>
 ```
 
 ### Comparsion
@@ -182,10 +111,10 @@ echo "http://testphp.vulnweb.com/artists.php?artist=1&id=2" | python3 pvreplace 
 http://fakedomain.com/fakefile.jsp;jsessionid=2ed4262dbe69850d25bc7c6424ba59db?hardwareid=FUZZ&tarifid=FUZZ
 
 ## pvreplace
-▶ echo "http://fakedomain.com/fakefile.jsp;jsessionid=2ed4262dbe69850d25bc7c6424ba59db?hardwareid=14&tarifid=9998" | pvreplace "FUZZ" -param-value
+▶ echo "http://fakedomain.com/fakefile.jsp;jsessionid=2ed4262dbe69850d25bc7c6424ba59db?hardwareid=14&tarifid=9998" | pvreplace -payload "FUZZ" -part param-value
 http://fakedomain.com/fakefile.jsp;jsessionid=FUZZ&tarifid=FUZZ
 
-▶ echo "http://fakedomain.com/fakefile.jsp;jsessionid=2ed4262dbe69850d25bc7c6424ba59db?hardwareid=14&tarifid=9998" | pvreplace "FUZZ" -param-value -single-replace
+▶ echo "http://fakedomain.com/fakefile.jsp;jsessionid=2ed4262dbe69850d25bc7c6424ba59db?hardwareid=14&tarifid=9998" | pvreplace -payload "FUZZ" -part param-value -mode single
 http://fakedomain.com/fakefile.jsp;jsessionid=FUZZ&tarifid=9998
 http://fakedomain.com/fakefile.jsp;jsessionid=2ed4262dbe69850d25bc7c6424ba59db?hardwareid=14&tarifid=FUZZ
 ```
