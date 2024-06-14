@@ -7,11 +7,11 @@ def print_help():
     print("\npositional arguments:")
     print("  strings             The string(s) to be replaced in URLs (default: FUZZ)")
     print("\noptions:")
-    print("  -without-encode    Optional argument to disable URL encoding (default: enabled)")
     print("  -part              Specify which part of the URL to modify Options: param-value, param-name, path-suffix, path-param, ext-filename (default: param-value)")
     print("  -type              Specify the type of modification Options: replace, prefix, postfix (default: replace)")
     print("  -mode              Specify the mode of replacement Options: multiple, single (default: multiple)")
     print("  -payload           Specify payload(s) directly or from a file")
+    print("  -without-encode    Optional argument to disable URL encoding (default: enabled)")
     print("  -v, --version      Prints current version")
     print("  -h, --help         Prints Help")
     exit(0)
@@ -27,7 +27,7 @@ def parse_args():
         print_help()
 
     if "-v" in argv or "--version" in argv:
-        print("pvreplace version: v0.0.2")
+        print("pvreplace version: v0.0.3")
         exit(0)
     
     if "-without-encode" in argv:
