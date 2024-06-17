@@ -17,7 +17,7 @@ positional arguments:
   strings             The string(s) to be replaced in URLs (default: FUZZ)
 
 options:
-  -part              Specify which part of the URL to modify Options: param-value, param-name, path-suffix, path-param, ext-filename (default: param-value)
+  -part              Specify which part of the URL to modify Options: param-value, param-name, path-suffix, path-segment, ext-filename (default: param-value)
   -type              Specify the type of modification Options: replace, prefix, postfix (default: replace)
   -mode              Specify the mode of replacement Options: multiple, single (default: multiple)
   -payload           Specify payload(s) directly or from a file
@@ -45,7 +45,7 @@ http://testphp.vulnweb.com/artists.php?FUZZ=1&FUZZ=2
 http://testphp.vulnweb.com/artists.phpFUZZ?artist=1&id=2
 ```
 
-`path-param - fuzz path-param for URL`
+`path-segment - fuzz path-segment for URL`
 ```
 ▶ echo "http://testphp.vulnweb.com/wp-admin/admin-ajax.php" | pvreplace -part path-segment
 http://testphp.vulnweb.com/wp-adminFUZZ/admin-ajax.php
