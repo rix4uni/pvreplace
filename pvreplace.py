@@ -27,7 +27,7 @@ def parse_args():
         print_help()
 
     if "-v" in argv or "--version" in argv:
-        print("pvreplace version: v0.0.3")
+        print("pvreplace version: v0.0.4")
         exit(0)
     
     if "-without-encode" in argv:
@@ -68,7 +68,7 @@ def parse_args():
     return strings_arg, encode, part, replace_type, mode
 
 def modify_url(url, encoded_strings, part, replace_type, mode):
-    domain = url.strip()
+    domain = ul.unquote(url.strip())
     modified_urls = []
 
     for encoded in encoded_strings:
