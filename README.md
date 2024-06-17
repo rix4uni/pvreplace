@@ -42,7 +42,7 @@ http://testphp.vulnweb.com/artists.php?FUZZ=1&FUZZ=2
 `path-suffix - fuzz path-suffix for URL`
 ```
 ▶ echo "http://testphp.vulnweb.com/artists.php?artist=1&id=2" | pvreplace -part path-suffix
-http://testphp.vulnweb.com/artists.php/FUZZ?artist=1&id=2
+http://testphp.vulnweb.com/artists.phpFUZZ?artist=1&id=2
 ```
 
 `path-param - fuzz path-param for URL`
