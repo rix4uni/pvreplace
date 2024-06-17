@@ -47,9 +47,8 @@ http://testphp.vulnweb.com/artists.phpFUZZ?artist=1&id=2
 
 `path-param - fuzz path-param for URL`
 ```
-▶ echo "http://testphp.vulnweb.com/artists.php?artist=1&id=2" | pvreplace -part path-param
-http://testphp.vulnweb.com/artists.php/FUZZ?artist=1&id=2
-http://testphp.vulnweb.com/artists.php?FUZZ&artist=1&id=2
+▶ echo "http://testphp.vulnweb.com/wp-admin/admin-ajax.php" | pvreplace -part path-segment
+http://testphp.vulnweb.com/wp-adminFUZZ/admin-ajax.php
 ```
 
 `ext-filename - fuzz ext-filename for URL`
