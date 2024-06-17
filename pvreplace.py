@@ -7,7 +7,7 @@ def print_help():
     print("\npositional arguments:")
     print("  strings             The string(s) to be replaced in URLs (default: FUZZ)")
     print("\noptions:")
-    print("  -part              Specify which part of the URL to modify Options: param-value, param-name, path-suffix, path-param, ext-filename (default: param-value)")
+    print("  -part              Specify which part of the URL to modify Options: param-value, param-name, path-suffix, path-segment, ext-filename (default: param-value)")
     print("  -type              Specify the type of modification Options: replace, prefix, postfix (default: replace)")
     print("  -mode              Specify the mode of replacement Options: multiple, single (default: multiple)")
     print("  -payload           Specify payload(s) directly or from a file")
@@ -109,50 +109,14 @@ def modify_url(url, encoded_strings, part, replace_type, mode):
                         return match.group(1) + match.group(2) + encoded + "="
                 modified_urls.append(re.sub(r"([?&])([^&=]+)=", replace_param_name, domain))
         elif part == "path-suffix":
-            if "?" in domain:
-                base, params = domain.split("?", 1)
-                if replace_type == "replace":
-                    modified_urls.append(f"{base}/{encoded}?{params}")
-                elif replace_type == "prefix":
-                    modified_urls.append(f"{base}/{encoded}{base.split('/')[-1]}?{params}")
-                elif replace_type == "postfix":
-                    modified_urls.append(f"{base}/{base.split('/')[-1]}{encoded}?{params}")
-            else:
-                if replace_type == "replace":
-                    modified_urls.append(domain + '/' + encoded)
-                elif replace_type == "prefix":
-                    modified_urls.append(domain + '/' + encoded + domain.split('/')[-1])
-                elif replace_type == "postfix":
-                    modified_urls.append(domain + '/' + domain.split('/')[-1] + encoded)
-        elif part == "path-param":
-            if "?" in domain:
-                base, params = domain.split("?", 1)
-                if replace_type == "replace":
-                    modified_urls.append(f"{base}/{encoded}?{params}")
-                    modified_urls.append(f"{base}?{encoded}&{params}")
-                elif replace_type == "prefix":
-                    modified_urls.append(f"{base}/{encoded}{base.split('/')[-1]}?{params}")
-                    modified_urls.append(f"{base}?{encoded}{base.split('/')[-1]}&{params}")
-                elif replace_type == "postfix":
-                    modified_urls.append(f"{base}/{base.split('/')[-1]}{encoded}?{params}")
-                    modified_urls.append(f"{base}?{base.split('/')[-1]}{encoded}&{params}")
-            else:
-                if replace_type == "replace":
-                    modified_urls.append(domain + '/' + encoded)
-                    modified_urls.append(domain + '?' + encoded)
-                elif replace_type == "prefix":
-                    modified_urls.append(domain + '/' + encoded + domain.split('/')[-1])
-                    modified_urls.append(domain + '?' + encoded + domain.split('/')[-1])
-                elif replace_type == "postfix":
-                    modified_urls.append(domain + '/' + domain.split('/')[-1] + encoded)
-                    modified_urls.append(domain + '?' + domain.split('/')[-1] + encoded)
+            matches = re.findall(r"/([^/]+\.(php|asp|aspx|jsp|jspx|xml))", domain)
+            for match in matches:
+                base_filename, ext = match
+                modified_urls.append(f"{domain.replace(base_filename, base_filename + encoded)}")
+        elif part == "path-segment":
+            pass
         elif part == "ext-filename":
-            if replace_type == "replace":
-                modified_urls.append(re.sub(r"/([^/]+)\.(php|aspx|asp|jsp|jspx|xml)", f"/{encoded}.\\2", domain))
-            elif replace_type == "prefix":
-                modified_urls.append(re.sub(r"/([^/]+)\.(php|aspx|asp|jsp|jspx|xml)", f"/{encoded}\\1.\\2", domain))
-            elif replace_type == "postfix":
-                modified_urls.append(re.sub(r"/([^/]+)\.(php|aspx|asp|jsp|jspx|xml)", f"/\\1{encoded}.\\2", domain))
+            modified_urls.append(re.sub(r"/([^/]+)\.(php|aspx|asp|jsp|jspx|xml)", f"/{encoded}.\\2", domain))
 
     return modified_urls
 
