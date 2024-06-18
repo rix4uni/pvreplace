@@ -27,7 +27,7 @@ def parse_args():
         print_help()
 
     if "-v" in argv or "--version" in argv:
-        print("pvreplace version: v0.0.4")
+        print("pvreplace version: v0.0.5")
         exit(0)
     
     if "-without-encode" in argv:
@@ -72,6 +72,7 @@ def modify_url(url, encoded_strings, part, replace_type, mode):
     modified_urls = []
 
     for encoded in encoded_strings:
+        # param-value
         if part == "param-value":
             if mode == "single":
                 params = re.findall(r"=[^&]*", domain)
@@ -89,6 +90,8 @@ def modify_url(url, encoded_strings, part, replace_type, mode):
                     modified_urls.append(re.sub(r"=([^&]*)", f"={encoded}\\1", domain))
                 elif replace_type == "postfix":
                     modified_urls.append(re.sub(r"=([^&]*)", f"=\\1{encoded}", domain))
+
+        # param-name
         elif part == "param-name":
             if mode == "single":
                 params = re.findall(r"([?&])([^&=]+)=", domain)
@@ -108,13 +111,33 @@ def modify_url(url, encoded_strings, part, replace_type, mode):
                     elif replace_type == "postfix":
                         return match.group(1) + match.group(2) + encoded + "="
                 modified_urls.append(re.sub(r"([?&])([^&=]+)=", replace_param_name, domain))
+
+        # path-suffix
         elif part == "path-suffix":
             matches = re.findall(r"/([^/]+\.(php|asp|aspx|jsp|jspx|xml))", domain)
             for match in matches:
                 base_filename, ext = match
                 modified_urls.append(f"{domain.replace(base_filename, base_filename + encoded)}")
+
+        # path-segment
         elif part == "path-segment":
-            pass
+            if replace_type == "replace":
+                matches = re.findall(r'https?://(?:[^/]+/)+([^/]+)/[^/]+\.(php|aspx|asp|jsp|jspx|xml)', domain)
+                for match in matches:
+                    base_filename, ext = match
+                    modified_urls.append(f"{domain.replace(base_filename, encoded)}")
+            elif replace_type == "prefix":
+                matches = re.findall(r'https?://(?:[^/]+/)+([^/]+)/[^/]+\.(php|aspx|asp|jsp|jspx|xml)', domain)
+                for match in matches:
+                    base_filename, ext = match
+                    modified_urls.append(f"{domain.replace(base_filename, encoded + base_filename)}")
+            elif replace_type == "postfix":
+                matches = re.findall(r'https?://(?:[^/]+/)+([^/]+)/[^/]+\.(php|aspx|asp|jsp|jspx|xml)', domain)
+                for match in matches:
+                    base_filename, ext = match
+                    modified_urls.append(f"{domain.replace(base_filename, base_filename + encoded)}")
+
+        # ext-filename
         elif part == "ext-filename":
             modified_urls.append(re.sub(r"/([^/]+)\.(php|aspx|asp|jsp|jspx|xml)", f"/{encoded}.\\2", domain))
 
