@@ -62,7 +62,7 @@ def parse_args():
             strings_arg = arg
 
     if payload_flag and payload_file:
-        with open(strings_arg, 'r') as file:
+        with open(strings_arg, 'r', encoding='utf-8') as file:
             strings_arg = file.read().strip().replace("\n", ",")
 
     return strings_arg, encode, part, replace_type, mode
