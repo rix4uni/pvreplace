@@ -1,0 +1,2 @@
+http://fakedomain.com/fakefile.jsp;jsessionid=2ed4262dbe69850d25bc7c6424ba59db?hardwareid=14&tarifid=9998
+http://testphp.vulnweb.com/artists.php?artist=1&id=2

@@ -1,0 +1,16 @@
+POST /userinfo.php HTTP/1.1
+Host: testphp.vulnweb.com
+Content-Length: 20
+Cache-Control: max-age=0
+Origin: http://testphp.vulnweb.com
+DNT: 1
+Upgrade-Insecure-Requests: 1
+Content-Type: application/x-www-form-urlencoded
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+Referer: http://testphp.vulnweb.com/login.php
+Accept-Encoding: gzip, deflate
+Accept-Language: en-US,en;q=0.9,hi;q=0.8,en-IN;q=0.7
+Connection: close
+
+uname=test&pass=test

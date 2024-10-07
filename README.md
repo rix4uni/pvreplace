@@ -1,122 +1,111 @@
-# pvreplace
+## pvreplace
  
-Accept URLs on stdin, replace all query string values with a user-supplied value, only output
-each combination of query string parameters once per host and path.
+pvreplace accept URLs on stdin, replace all query string values with a user-supplied value, only output each combination of query string parameters once per host and path.
 
 ## Installation
 ```
-git clone https://github.com/rix4uni/pvreplace.git ~/bin/pvreplace
-echo "alias pvreplace='python3 ~/bin/pvreplace/pvreplace.py'" >> ~/.bashrc && source ~/.bashrc
+go install github.com/rix4uni/pvreplace@latest
+```
+
+## Download prebuilt binaries
+```
+wget https://github.com/rix4uni/pvreplace/releases/download/v0.0.1/pvreplace-linux-amd64-0.0.1.tgz
+tar -xvzf pvreplace-linux-amd64-0.0.1.tgz
+rm -rf pvreplace-linux-amd64-0.0.1.tgz
+mv pvreplace ~/go/bin/pvreplace
+```
+Or download [binary release](https://github.com/rix4uni/pvreplace/releases) for your platform.
+
+## Compile from source
+```
+git clone --depth 1 github.com/rix4uni/pvreplace.git
+cd pvreplace; go install
 ```
 
 ## Usage
+```console
+Usage of pvreplace:
+  -fuzzing-mode string
+        Fuzzing mode: single, multiple (default "multiple")
+  -fuzzing-part string
+        Fuzzing part: param-value, param-name, path-suffix, path-segment (default "param-value")
+  -fuzzing-type string
+        Fuzzing type: replace, prefix, postfix (default "replace")
+  -ignore-lines string
+        Comma-separated list or file of lines to ignore in raw data
+  -list string
+        File containing URLs to process
+  -payload string
+        Comma-separated list of payloads or a file with payloads (default "FUZZ")
+  -raw string
+        File containing Burp Suite raw request data to process
+  -u string
+        The URL to process
 ```
-Usage: python3 pvreplace.py [strings] [-without-encode] [-part] [-type] [-mode] [-payload [strings or filepath]]
 
-positional arguments:
-  strings             The string(s) to be replaced in URLs (default: FUZZ)
-
-options:
-  -part              Specify which part of the URL to modify Options: param-value, param-name, path-suffix, path-segment, ext-filename (default: param-value)
-  -type              Specify the type of modification Options: replace, prefix, postfix (default: replace)
-  -mode              Specify the mode of replacement Options: multiple, single (default: multiple)
-  -payload           Specify payload(s) directly or from a file
-  -without-encode    Optional argument to disable URL encoding (default: enabled)
-  -v, --version      Prints current version
-  -h, --help         Prints Help
-```
-
-## Part
+## Fuzzing-Part
 `param-value (default) - fuzz param-value for URL`
 ```
-▶ echo "http://testphp.vulnweb.com/artists.php?artist=1&id=2" | pvreplace -part param-value
+▶ echo "http://testphp.vulnweb.com/artists.php?artist=1&id=2" | pvreplace -fuzzing-part param-value
 http://testphp.vulnweb.com/artists.php?artist=FUZZ&id=FUZZ
 ```
 
 `param-name - fuzz param-name for URL`
 ```
-▶ echo "http://testphp.vulnweb.com/artists.php?artist=1&id=2" | pvreplace -part param-name
+▶ echo "http://testphp.vulnweb.com/artists.php?artist=1&id=2" | pvreplace -fuzzing-part param-name
 http://testphp.vulnweb.com/artists.php?FUZZ=1&FUZZ=2
 ```
 
 `path-suffix - fuzz path-suffix for URL`
 ```
-▶ echo "http://testphp.vulnweb.com/artists.php?artist=1&id=2" | pvreplace -part path-suffix
+▶ echo "http://testphp.vulnweb.com/artists.php?artist=1&id=2" | pvreplace -fuzzing-part path-suffix
 http://testphp.vulnweb.com/artists.phpFUZZ?artist=1&id=2
 ```
 
 `path-segment - fuzz path-segment for URL`
 ```
-▶ echo "http://testphp.vulnweb.com/wp-admin/admin-ajax.php" | pvreplace -part path-segment
+▶ echo "http://testphp.vulnweb.com/wp-admin/admin-ajax.php" | pvreplace -fuzzing-part path-segment
 http://testphp.vulnweb.com/wp-adminFUZZ/admin-ajax.php
 ```
 
 `ext-filename - fuzz ext-filename for URL`
 ```
-▶ echo "http://testphp.vulnweb.com/artists.php?artist=1&id=2" | pvreplace -part ext-filename
+▶ echo "http://testphp.vulnweb.com/artists.php?artist=1&id=2" | pvreplace -fuzzing-part ext-filename
 http://testphp.vulnweb.com/FUZZ.php?artist=1&id=2
 ```
 
-## Type
+## Fuzzing-Type
 `replace (default) - replace the value with payload`
 ```
-▶ echo "http://testphp.vulnweb.com/artists.php?artist=1&id=2" | pvreplace -type replace
+▶ echo "http://testphp.vulnweb.com/artists.php?artist=1&id=2" | pvreplace -fuzzing-type replace
 http://testphp.vulnweb.com/artists.php?artist=FUZZ&id=FUZZ
 ```
 
 `prefix - prefix the value with payload`
 ```
-▶ echo "http://testphp.vulnweb.com/artists.php?artist=1&id=2" | pvreplace -type prefix
+▶ echo "http://testphp.vulnweb.com/artists.php?artist=1&id=2" | pvreplace -fuzzing-type prefix
 http://testphp.vulnweb.com/artists.php?artist=FUZZ1&id=FUZZ2
 ```
 
 `postfix - postfix the value with payload`
 ```
-▶ echo "http://testphp.vulnweb.com/artists.php?artist=1&id=2" | pvreplace -type postfix
+▶ echo "http://testphp.vulnweb.com/artists.php?artist=1&id=2" | pvreplace -fuzzing-type postfix
 http://testphp.vulnweb.com/artists.php?artist=1FUZZ&id=2FUZZ
 ```
 
-## Mode
+## Fuzzing-Mode
 `multiple (default) - replace all values at once`
 ```
-▶ echo "http://testphp.vulnweb.com/artists.php?artist=1&id=2" | pvreplace -mode multiple
+▶ echo "http://testphp.vulnweb.com/artists.php?artist=1&id=2" | pvreplace -fuzzing-mode multiple
 http://testphp.vulnweb.com/artists.php?artist=FUZZ&id=FUZZ
 ```
 
 `single - replace one value at a time`
 ```
-▶ echo "http://testphp.vulnweb.com/artists.php?artist=1&id=2" | pvreplace -mode single
+▶ echo "http://testphp.vulnweb.com/artists.php?artist=1&id=2" | pvreplace -fuzzing-mode single
 http://testphp.vulnweb.com/artists.php?artist=FUZZ&id=2
 http://testphp.vulnweb.com/artists.php?artist=1&id=FUZZ
 ```
 
-## Payload without encode
-```
-▶ echo "http://testphp.vulnweb.com/artists.php?artist=1&id=2" | pvreplace -payload '"><script>confirm(1)</script>, "<image/src/onerror=confirm(1)>' -without-encode
-http://testphp.vulnweb.com/artists.php?artist="><script>confirm(1)</script>&id="><script>confirm(1)</script>
-http://testphp.vulnweb.com/artists.php?artist="<image/src/onerror=confirm(1)>&id="<image/src/onerror=confirm(1)>
-
-or
-
-▶ echo "http://testphp.vulnweb.com/artists.php?artist=1&id=2" | pvreplace -payload payloads.txt -without-encode
-http://testphp.vulnweb.com/artists.php?artist="><script>confirm(1)</script>&id="><script>confirm(1)</script>
-http://testphp.vulnweb.com/artists.php?artist="<image/src/onerror=confirm(1)>&id="<image/src/onerror=confirm(1)>
-```
-
-### Comparsion
-```
-## qsreplace
-▶ echo "http://fakedomain.com/fakefile.jsp;jsessionid=2ed4262dbe69850d25bc7c6424ba59db?hardwareid=14&tarifid=9998" | qsreplace "FUZZ"
-http://fakedomain.com/fakefile.jsp;jsessionid=2ed4262dbe69850d25bc7c6424ba59db?hardwareid=FUZZ&tarifid=FUZZ
-
-## pvreplace
-▶ echo "http://fakedomain.com/fakefile.jsp;jsessionid=2ed4262dbe69850d25bc7c6424ba59db?hardwareid=14&tarifid=9998" | pvreplace -payload "FUZZ" -part param-value
-http://fakedomain.com/fakefile.jsp;jsessionid=FUZZ&tarifid=FUZZ
-
-▶ echo "http://fakedomain.com/fakefile.jsp;jsessionid=2ed4262dbe69850d25bc7c6424ba59db?hardwareid=14&tarifid=9998" | pvreplace -payload "FUZZ" -part param-value -mode single
-http://fakedomain.com/fakefile.jsp;jsessionid=FUZZ&tarifid=9998
-http://fakedomain.com/fakefile.jsp;jsessionid=2ed4262dbe69850d25bc7c6424ba59db?hardwareid=14&tarifid=FUZZ
-```
-
-## Credit
-This tool was inspired by @R0X4R's [bhedak](https://github.com/R0X4R/bhedak) tool. Thanks to them for the great idea!
+## TODO
+- use "github.com/projectdiscovery/goflags"
