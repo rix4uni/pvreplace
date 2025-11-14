@@ -1,3 +1,16 @@
-User-Agent:
+Referer:
 Accept-Language:
 Accept:
+Cache-Control:
+Host:
+Content-Length:
+Content-Type:
+Accept-Encoding:
+Connection:
+DNT:
+Upgrade-Insecure-Requests:
+Origin:
+Sec-Fetch-
+Pragma:
+If-Modified-Since:
+If-None-Match:

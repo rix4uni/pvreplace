@@ -4,31 +4,15 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/rix4uni/pvreplace/banner"
 )
-
-// prints the version message
-const version = "0.0.6"
-
-func printVersion() {
-	fmt.Printf("Current pvreplace version %s\n", version)
-}
-
-// Prints the Colorful banner
-func printBanner() {
-	banner := `
-                                     __                 
-    ____  _   __ _____ ___   ____   / /____ _ _____ ___ 
-   / __ \| | / // ___// _ \ / __ \ / // __  // ___// _ \
-  / /_/ /| |/ // /   /  __// /_/ // // /_/ // /__ /  __/
- / .___/ |___//_/    \___// .___//_/ \__,_/ \___/ \___/ 
-/_/                      /_/                            
-`
-fmt.Printf("%s\n%70s\n\n", banner, "Current pvreplace version "+version)
-
-}
 
 func main() {
 	// Define command-line flags
@@ -40,20 +24,34 @@ func main() {
 	fuzzingMode := flag.String("fuzzing-mode", "multiple", "Fuzzing mode: single, multiple")
 	fuzzingType := flag.String("fuzzing-type", "replace", "Fuzzing type: replace, prefix, postfix")
 	fuzzingPart := flag.String("fuzzing-part", "param-value", "Fuzzing part: param-value, param-name, path-suffix, path-segment")
-	silent := flag.Bool("silent", false, "silent mode.")
+	output := flag.String("output", "", "Directory to save modified requests (default: ~/.config/pvreplace/modified_request)")
+	silent := flag.Bool("silent", false, "Silent mode.")
 	version := flag.Bool("version", false, "Print the version of the tool and exit.")
+	verbose := flag.Bool("verbose", false, "Show detailed information about what's being processed.")
 	flag.Parse()
 
 	// Print version and exit if -version flag is provided
 	if *version {
-		printBanner()
-		printVersion()
+		banner.PrintBanner()
+		banner.PrintVersion()
 		return
 	}
 
 	// Don't Print banner if -silnet flag is provided
 	if !*silent {
-		printBanner()
+		banner.PrintBanner()
+	}
+
+	// Validate that -ignore-lines can only be used with -raw flag
+	if *ignoreLines != "" && *raw == "" {
+		fmt.Fprintf(os.Stderr, "Error: -ignore-lines flag can only be used with -raw flag\n")
+		os.Exit(1)
+	}
+
+	// Validate that -output can only be used with -raw flag
+	if *output != "" && *raw == "" {
+		fmt.Fprintf(os.Stderr, "Error: -output flag can only be used with -raw flag\n")
+		os.Exit(1)
 	}
 
 	// Regular expressions for different fuzzing parts
@@ -63,6 +61,7 @@ func main() {
 	rePathSegment := regexp.MustCompile(`(https?://(?:[^/]+/)+)([^/]+)/([^/]+\.(php|aspx|asp|jsp|jspx|xml))`) // For path segment
 	rePathExt := regexp.MustCompile(`/([^/]+)\.(php|aspx|asp|jsp|jspx|xml)`)                                  // For file extensions in paths
 	reUserAgent := regexp.MustCompile(`^(User-Agent:\s)(.*)$`)                                                // For matching headers
+	reHeader := regexp.MustCompile(`^(User-Agent|Referer|Cookie|X-Forwarded-For|X-Real-IP):\s*(.*)$`)         // For matching injectable headers
 
 	// Function to read payloads from a file or comma-separated list
 	getPayloads := func(input string) ([]string, error) {
@@ -118,6 +117,90 @@ func main() {
 
 		// Split comma-separated values
 		return strings.Split(input, ","), nil
+	}
+
+	// Function to get the default ignore-lines.txt path
+	getDefaultIgnoreLinesPath := func() (string, error) {
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			return "", fmt.Errorf("error getting home directory: %v", err)
+		}
+		configDir := filepath.Join(homeDir, ".config", "pvreplace")
+		return filepath.Join(configDir, "ignore-lines.txt"), nil
+	}
+
+	// Function to download ignore-lines.txt from GitHub
+	downloadIgnoreLines := func(filePath string) error {
+		url := "https://raw.githubusercontent.com/rix4uni/pvreplace/refs/heads/main/ignore-lines.txt"
+
+		resp, err := http.Get(url)
+		if err != nil {
+			return fmt.Errorf("error downloading ignore-lines.txt: %v", err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			return fmt.Errorf("error downloading ignore-lines.txt: HTTP %d", resp.StatusCode)
+		}
+
+		// Create directory if it doesn't exist
+		dir := filepath.Dir(filePath)
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return fmt.Errorf("error creating config directory: %v", err)
+		}
+
+		// Create the file
+		file, err := os.Create(filePath)
+		if err != nil {
+			return fmt.Errorf("error creating ignore-lines.txt: %v", err)
+		}
+		defer file.Close()
+
+		// Write the downloaded content to file
+		_, err = io.Copy(file, resp.Body)
+		if err != nil {
+			return fmt.Errorf("error writing ignore-lines.txt: %v", err)
+		}
+
+		if *verbose {
+			fmt.Fprintf(os.Stderr, "[+] Downloaded ignore-lines.txt to: %s\n", filePath)
+		}
+		return nil
+	}
+
+	// Function to ensure default ignore-lines.txt exists
+	ensureDefaultIgnoreLines := func() (string, error) {
+		defaultPath, err := getDefaultIgnoreLinesPath()
+		if err != nil {
+			return "", err
+		}
+
+		// Check if file exists
+		if _, err := os.Stat(defaultPath); os.IsNotExist(err) {
+			// Download the file from GitHub
+			if err := downloadIgnoreLines(defaultPath); err != nil {
+				return "", err
+			}
+		}
+
+		return defaultPath, nil
+	}
+
+	// Function to get the default output directory path
+	getDefaultOutputPath := func() (string, error) {
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			return "", fmt.Errorf("error getting home directory: %v", err)
+		}
+		return filepath.Join(homeDir, ".config", "pvreplace", "modified_request"), nil
+	}
+
+	// Function to ensure output directory exists
+	ensureOutputDir := func(outputPath string) error {
+		if err := os.MkdirAll(outputPath, 0755); err != nil {
+			return fmt.Errorf("error creating output directory: %v", err)
+		}
+		return nil
 	}
 
 	// Function to process and replace parts of a URL based on fuzzing mode, type, and part
@@ -279,6 +362,19 @@ func main() {
 		}
 	}
 
+	// Function to check if a line is an injectable header
+	isInjectableHeader := func(line string) bool {
+		return reHeader.MatchString(line)
+	}
+
+	// Function to add payload to injectable headers
+	fuzzHeader := func(line, payload string) string {
+		if reHeader.MatchString(line) {
+			return reHeader.ReplaceAllString(line, "${1}: ${2}"+payload)
+		}
+		return line
+	}
+
 	// Handle URL passed via the `-u` flag
 	if *url != "" {
 		payloads, err := getPayloads(*payload)
@@ -324,10 +420,36 @@ func main() {
 
 	// Handle Burp Suite raw request data passed via the `-raw` flag
 	if *raw != "" {
-		content, err := os.ReadFile(*raw)
+		// Check if the path is a directory or a file
+		fileInfo, err := os.Stat(*raw)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error reading raw request file: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Error accessing raw request path: %v\n", err)
 			return
+		}
+
+		var filesToProcess []string
+
+		if fileInfo.IsDir() {
+			// Read all files from the directory
+			entries, err := os.ReadDir(*raw)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error reading directory: %v\n", err)
+				return
+			}
+
+			for _, entry := range entries {
+				if !entry.IsDir() {
+					filesToProcess = append(filesToProcess, filepath.Join(*raw, entry.Name()))
+				}
+			}
+
+			if len(filesToProcess) == 0 {
+				fmt.Fprintf(os.Stderr, "Error: No files found in directory: %s\n", *raw)
+				return
+			}
+		} else {
+			// Single file
+			filesToProcess = append(filesToProcess, *raw)
 		}
 
 		payloads, err := getPayloads(*payload)
@@ -338,8 +460,22 @@ func main() {
 
 		// Prepare the ignore lines set
 		ignoreSet := make(map[string]bool)
-		if *ignoreLines != "" {
-			lines, err := getIgnoreLines(*ignoreLines)
+
+		// Determine which ignore-lines file to use
+		ignoreLinesPath := *ignoreLines
+		if ignoreLinesPath == "" {
+			// Use default path if --ignore-lines is not provided
+			defaultPath, err := ensureDefaultIgnoreLines()
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Warning: Could not use default ignore-lines.txt: %v\n", err)
+			} else {
+				ignoreLinesPath = defaultPath
+			}
+		}
+
+		// Load ignore patterns
+		if ignoreLinesPath != "" {
+			lines, err := getIgnoreLines(ignoreLinesPath)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "%v\n", err)
 				return
@@ -349,33 +485,106 @@ func main() {
 			}
 		}
 
-		// Process the content line by line
-		for _, payload := range payloads {
-			scanner := bufio.NewScanner(strings.NewReader(string(content)))
-			for scanner.Scan() {
-				line := scanner.Text()
+		// Determine output directory
+		var outputDir string
+		var useOutputDir bool
+		if *output != "" {
+			outputDir = *output
+			useOutputDir = true
+		} else {
+			// Use default output directory
+			defaultOutput, err := getDefaultOutputPath()
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Warning: Could not get default output path: %v\n", err)
+			} else {
+				outputDir = defaultOutput
+				useOutputDir = true
+			}
+		}
 
-				// Check if the line should be ignored
-				ignore := false
-				for prefix := range ignoreSet {
-					if strings.HasPrefix(line, prefix) {
-						ignore = true
-						break
+		// Create output directory if needed
+		if useOutputDir {
+			if err := ensureOutputDir(outputDir); err != nil {
+				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+				return
+			}
+		}
+
+		// Process each file
+		for _, filePath := range filesToProcess {
+			content, err := os.ReadFile(filePath)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error reading file %s: %v\n", filePath, err)
+				continue
+			}
+
+			// Prepare output file if output directory is specified
+			var outputFile *os.File
+			if useOutputDir {
+				baseFileName := filepath.Base(filePath)
+				outputFilePath := filepath.Join(outputDir, baseFileName)
+				outputFile, err = os.Create(outputFilePath)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "Error creating output file %s: %v\n", outputFilePath, err)
+					continue
+				}
+				defer outputFile.Close()
+
+				if *verbose {
+					fmt.Fprintf(os.Stderr, "[+] Saving modified request to: %s\n", outputFilePath)
+				}
+			}
+
+			// Process the content line by line
+			for _, payload := range payloads {
+				scanner := bufio.NewScanner(strings.NewReader(string(content)))
+				for scanner.Scan() {
+					line := scanner.Text()
+
+					// Check if the line should be ignored
+					ignore := false
+					for prefix := range ignoreSet {
+						if strings.HasPrefix(line, prefix) {
+							ignore = true
+							break
+						}
+					}
+
+					var modifiedLine string
+					// If the line is ignored, print it as-is without fuzzing
+					if ignore {
+						modifiedLine = line
+					} else if isInjectableHeader(line) {
+						// If it's an injectable header, append payload to the end
+						modifiedLine = fuzzHeader(line, strings.TrimSpace(payload))
+					} else {
+						// Check if line contains parameters or needs fuzzing
+						if reValue.MatchString(line) {
+							modifiedLine = reValue.ReplaceAllString(line, "="+strings.TrimSpace(payload))
+						} else {
+							modifiedLine = line
+						}
+					}
+
+					// Print to stdout
+					fmt.Println(modifiedLine)
+
+					// Write to output file if specified
+					if outputFile != nil {
+						fmt.Fprintln(outputFile, modifiedLine)
 					}
 				}
 
-				// If the line is not ignored, replace parameter values
-				if !ignore {
-					processURL(line, strings.TrimSpace(payload), *fuzzingMode, *fuzzingType, *fuzzingPart)
+				if err := scanner.Err(); err != nil {
+					fmt.Fprintf(os.Stderr, "Error reading raw data: %v\n", err)
+				}
+
+				// Separate different payload outputs with a newline
+				fmt.Println()
+				if outputFile != nil {
+					fmt.Fprintln(outputFile)
 				}
 			}
-
-			if err := scanner.Err(); err != nil {
-				fmt.Fprintf(os.Stderr, "Error reading raw data: %v\n", err)
-			}
-
-			// Separate different payload outputs with a newline
-			fmt.Println()
 		}
 		return
 	}
