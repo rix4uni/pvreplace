@@ -14,3 +14,4 @@ Sec-Fetch-
 Pragma:
 If-Modified-Since:
 If-None-Match:
+Priority:
