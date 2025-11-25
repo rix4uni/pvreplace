@@ -12,7 +12,21 @@ import (
 	"strings"
 
 	"github.com/rix4uni/pvreplace/banner"
+	"gopkg.in/yaml.v3"
 )
+
+// Config represents the root structure of the YAML config file
+type Config struct {
+	Configurations []FuzzingConfig `yaml:"configurations"`
+}
+
+// FuzzingConfig represents a single fuzzing configuration
+type FuzzingConfig struct {
+	FuzzingPart string `yaml:"fuzzing-part"`
+	FuzzingType string `yaml:"fuzzing-type"`
+	FuzzingMode string `yaml:"fuzzing-mode"`
+	Ignore      bool   `yaml:"ignore,omitempty"`
+}
 
 func main() {
 	// Define command-line flags
@@ -23,12 +37,41 @@ func main() {
 	ignoreLines := flag.String("ignore-lines", "", "Comma-separated list or file of lines to ignore in raw data")
 	fuzzingMode := flag.String("fuzzing-mode", "multiple", "Fuzzing mode: single, multiple")
 	fuzzingType := flag.String("fuzzing-type", "replace", "Fuzzing type: replace, prefix, postfix")
-	fuzzingPart := flag.String("fuzzing-part", "param-value", "Fuzzing part: param-value, param-name, path-suffix, path-segment")
+	fuzzingPart := flag.String("fuzzing-part", "param-value", "Fuzzing part: param-value, param-name, path-suffix, path-suffix-slash, path-segment, path-ext, headers, all")
+	config := flag.String("config", "", "Path to YAML config file with fuzzing configurations")
 	output := flag.String("output", "", "Directory to save modified requests (default: ~/.config/pvreplace/modified_request)")
 	silent := flag.Bool("silent", false, "Silent mode.")
 	version := flag.Bool("version", false, "Print the version of the tool and exit.")
 	verbose := flag.Bool("verbose", false, "Show detailed information about what's being processed.")
 	flag.Parse()
+
+	// Define all available fuzzing parts
+	allFuzzingParts := []string{"param-value", "param-name", "path-suffix", "path-suffix-slash", "path-segment", "path-ext", "headers"}
+
+	// Function to load and parse config file
+	loadConfig := func(configPath string) ([]FuzzingConfig, error) {
+		file, err := os.Open(configPath)
+		if err != nil {
+			return nil, fmt.Errorf("error opening config file: %v", err)
+		}
+		defer file.Close()
+
+		var config Config
+		decoder := yaml.NewDecoder(file)
+		if err := decoder.Decode(&config); err != nil {
+			return nil, fmt.Errorf("error parsing config file: %v", err)
+		}
+
+		// Filter out ignored configurations
+		var activeConfigs []FuzzingConfig
+		for _, cfg := range config.Configurations {
+			if !cfg.Ignore {
+				activeConfigs = append(activeConfigs, cfg)
+			}
+		}
+
+		return activeConfigs, nil
+	}
 
 	// Print version and exit if -version flag is provided
 	if *version {
@@ -52,6 +95,20 @@ func main() {
 	if *output != "" && *raw == "" {
 		fmt.Fprintf(os.Stderr, "Error: -output flag can only be used with -raw flag\n")
 		os.Exit(1)
+	}
+
+	// Validate that -config cannot be used with -fuzzing-mode, -fuzzing-type, or -fuzzing-part
+	if *config != "" {
+		var conflictingFlags []string
+		flag.Visit(func(f *flag.Flag) {
+			if f.Name == "fuzzing-mode" || f.Name == "fuzzing-type" || f.Name == "fuzzing-part" {
+				conflictingFlags = append(conflictingFlags, "-"+f.Name)
+			}
+		})
+		if len(conflictingFlags) > 0 {
+			fmt.Fprintf(os.Stderr, "Error: -config flag cannot be used with %s flags\n", strings.Join(conflictingFlags, ", "))
+			os.Exit(1)
+		}
 	}
 
 	// Regular expressions for different fuzzing parts
@@ -129,6 +186,16 @@ func main() {
 		return filepath.Join(configDir, "ignore-lines.txt"), nil
 	}
 
+	// Function to get the default config.yaml path
+	getDefaultConfigPath := func() (string, error) {
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			return "", fmt.Errorf("error getting home directory: %v", err)
+		}
+		configDir := filepath.Join(homeDir, ".config", "pvreplace")
+		return filepath.Join(configDir, "config.yaml"), nil
+	}
+
 	// Function to download ignore-lines.txt from GitHub
 	downloadIgnoreLines := func(filePath string) error {
 		url := "https://raw.githubusercontent.com/rix4uni/pvreplace/refs/heads/main/ignore-lines.txt"
@@ -168,6 +235,45 @@ func main() {
 		return nil
 	}
 
+	// Function to download config.yaml from GitHub
+	downloadConfig := func(filePath string) error {
+		url := "https://raw.githubusercontent.com/rix4uni/pvreplace/refs/heads/main/config.yaml"
+
+		resp, err := http.Get(url)
+		if err != nil {
+			return fmt.Errorf("error downloading config.yaml: %v", err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			return fmt.Errorf("error downloading config.yaml: HTTP %d", resp.StatusCode)
+		}
+
+		// Create directory if it doesn't exist
+		dir := filepath.Dir(filePath)
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return fmt.Errorf("error creating config directory: %v", err)
+		}
+
+		// Create the file
+		file, err := os.Create(filePath)
+		if err != nil {
+			return fmt.Errorf("error creating config.yaml: %v", err)
+		}
+		defer file.Close()
+
+		// Write the downloaded content to file
+		_, err = io.Copy(file, resp.Body)
+		if err != nil {
+			return fmt.Errorf("error writing config.yaml: %v", err)
+		}
+
+		if *verbose {
+			fmt.Fprintf(os.Stderr, "[+] Downloaded config.yaml to: %s\n", filePath)
+		}
+		return nil
+	}
+
 	// Function to ensure default ignore-lines.txt exists
 	ensureDefaultIgnoreLines := func() (string, error) {
 		defaultPath, err := getDefaultIgnoreLinesPath()
@@ -179,6 +285,24 @@ func main() {
 		if _, err := os.Stat(defaultPath); os.IsNotExist(err) {
 			// Download the file from GitHub
 			if err := downloadIgnoreLines(defaultPath); err != nil {
+				return "", err
+			}
+		}
+
+		return defaultPath, nil
+	}
+
+	// Function to ensure default config.yaml exists
+	ensureDefaultConfig := func() (string, error) {
+		defaultPath, err := getDefaultConfigPath()
+		if err != nil {
+			return "", err
+		}
+
+		// Check if file exists
+		if _, err := os.Stat(defaultPath); os.IsNotExist(err) {
+			// Download the file from GitHub
+			if err := downloadConfig(defaultPath); err != nil {
 				return "", err
 			}
 		}
@@ -301,6 +425,29 @@ func main() {
 				}
 			}
 
+		case "path-suffix-slash":
+			if mode == "multiple" {
+				switch ftype {
+				case "replace":
+					modifiedURL = rePathSuffix.ReplaceAllString(url, "${0}/"+payload)
+				default:
+					fmt.Fprintf(os.Stderr, "Invalid fuzzing type: %s (path-suffix-slash only supports replace)\n", ftype)
+					return
+				}
+				fmt.Println(modifiedURL)
+			} else if mode == "single" {
+				for _, match := range rePathSuffix.FindAllStringIndex(url, -1) {
+					switch ftype {
+					case "replace":
+						modifiedURL = url[:match[1]] + "/" + payload + url[match[1]:]
+					default:
+						fmt.Fprintf(os.Stderr, "Invalid fuzzing type: %s (path-suffix-slash only supports replace)\n", ftype)
+						return
+					}
+					fmt.Println(modifiedURL)
+				}
+			}
+
 		case "path-segment":
 			if mode == "multiple" {
 				switch ftype {
@@ -316,7 +463,9 @@ func main() {
 				}
 				fmt.Println(modifiedURL)
 			} else if mode == "single" {
-				fmt.Println("You cannot use -fuzzing-mode single with -fuzzing-part path-segment")
+				if *verbose {
+					fmt.Println("You cannot use -fuzzing-mode single with -fuzzing-part path-segment")
+				}
 			}
 
 		case "path-ext":
@@ -334,7 +483,9 @@ func main() {
 				}
 				fmt.Println(modifiedURL)
 			} else if mode == "single" {
-				fmt.Println("You cannot use -fuzzing-mode single with -fuzzing-part path-segment")
+				if *verbose {
+					fmt.Println("You cannot use -fuzzing-mode single with -fuzzing-part path-segment")
+				}
 			}
 
 		case "headers":
@@ -353,7 +504,9 @@ func main() {
 				fmt.Println(modifiedURL)
 			} else if mode == "single" {
 				// Handle single replacement mode if needed
-				fmt.Println("You cannot use -fuzzing-mode single with -fuzzing-part path-segment")
+				if *verbose {
+					fmt.Println("You cannot use -fuzzing-mode single with -fuzzing-part headers")
+				}
 			}
 
 		default:
@@ -383,8 +536,50 @@ func main() {
 			return
 		}
 
+		// Load config if provided or use default
+		var configs []FuzzingConfig
+		configPath := *config
+		if configPath == "" {
+			// Use default config path
+			defaultPath, err := ensureDefaultConfig()
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Warning: Could not use default config.yaml: %v\n", err)
+			} else {
+				configPath = defaultPath
+			}
+		}
+
+		if configPath != "" {
+			loadedConfigs, err := loadConfig(configPath)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "%v\n", err)
+				return
+			}
+			configs = loadedConfigs
+		}
+
 		for _, p := range payloads {
-			processURL(*url, strings.TrimSpace(p), *fuzzingMode, *fuzzingType, *fuzzingPart)
+			if len(configs) > 0 {
+				// Process with each config from file
+				for _, cfg := range configs {
+					if cfg.FuzzingPart == "all" {
+						for _, part := range allFuzzingParts {
+							processURL(*url, strings.TrimSpace(p), cfg.FuzzingMode, cfg.FuzzingType, part)
+						}
+					} else {
+						processURL(*url, strings.TrimSpace(p), cfg.FuzzingMode, cfg.FuzzingType, cfg.FuzzingPart)
+					}
+				}
+			} else {
+				// Use flag-based configuration
+				if *fuzzingPart == "all" {
+					for _, part := range allFuzzingParts {
+						processURL(*url, strings.TrimSpace(p), *fuzzingMode, *fuzzingType, part)
+					}
+				} else {
+					processURL(*url, strings.TrimSpace(p), *fuzzingMode, *fuzzingType, *fuzzingPart)
+				}
+			}
 		}
 		return
 	}
@@ -404,11 +599,53 @@ func main() {
 			return
 		}
 
+		// Load config if provided or use default
+		var configs []FuzzingConfig
+		configPath := *config
+		if configPath == "" {
+			// Use default config path
+			defaultPath, err := ensureDefaultConfig()
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Warning: Could not use default config.yaml: %v\n", err)
+			} else {
+				configPath = defaultPath
+			}
+		}
+
+		if configPath != "" {
+			loadedConfigs, err := loadConfig(configPath)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "%v\n", err)
+				return
+			}
+			configs = loadedConfigs
+		}
+
 		scanner := bufio.NewScanner(file)
 		for scanner.Scan() {
 			url := scanner.Text()
 			for _, p := range payloads {
-				processURL(url, strings.TrimSpace(p), *fuzzingMode, *fuzzingType, *fuzzingPart)
+				if len(configs) > 0 {
+					// Process with each config from file
+					for _, cfg := range configs {
+						if cfg.FuzzingPart == "all" {
+							for _, part := range allFuzzingParts {
+								processURL(url, strings.TrimSpace(p), cfg.FuzzingMode, cfg.FuzzingType, part)
+							}
+						} else {
+							processURL(url, strings.TrimSpace(p), cfg.FuzzingMode, cfg.FuzzingType, cfg.FuzzingPart)
+						}
+					}
+				} else {
+					// Use flag-based configuration
+					if *fuzzingPart == "all" {
+						for _, part := range allFuzzingParts {
+							processURL(url, strings.TrimSpace(p), *fuzzingMode, *fuzzingType, part)
+						}
+					} else {
+						processURL(url, strings.TrimSpace(p), *fuzzingMode, *fuzzingType, *fuzzingPart)
+					}
+				}
 			}
 		}
 
@@ -596,11 +833,53 @@ func main() {
 		return
 	}
 
+	// Load config if provided or use default
+	var configs []FuzzingConfig
+	configPath := *config
+	if configPath == "" {
+		// Use default config path
+		defaultPath, err := ensureDefaultConfig()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: Could not use default config.yaml: %v\n", err)
+		} else {
+			configPath = defaultPath
+		}
+	}
+
+	if configPath != "" {
+		loadedConfigs, err := loadConfig(configPath)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "%v\n", err)
+			return
+		}
+		configs = loadedConfigs
+	}
+
 	scanner := bufio.NewScanner(os.Stdin)
 	for scanner.Scan() {
 		url := scanner.Text()
 		for _, p := range payloads {
-			processURL(url, strings.TrimSpace(p), *fuzzingMode, *fuzzingType, *fuzzingPart)
+			if len(configs) > 0 {
+				// Process with each config from file
+				for _, cfg := range configs {
+					if cfg.FuzzingPart == "all" {
+						for _, part := range allFuzzingParts {
+							processURL(url, strings.TrimSpace(p), cfg.FuzzingMode, cfg.FuzzingType, part)
+						}
+					} else {
+						processURL(url, strings.TrimSpace(p), cfg.FuzzingMode, cfg.FuzzingType, cfg.FuzzingPart)
+					}
+				}
+			} else {
+				// Use flag-based configuration
+				if *fuzzingPart == "all" {
+					for _, part := range allFuzzingParts {
+						processURL(url, strings.TrimSpace(p), *fuzzingMode, *fuzzingType, part)
+					}
+				} else {
+					processURL(url, strings.TrimSpace(p), *fuzzingMode, *fuzzingType, *fuzzingPart)
+				}
+			}
 		}
 	}
 

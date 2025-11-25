@@ -5,7 +5,7 @@ import (
 )
 
 // prints the version message
-const version = "v0.0.7"
+const version = "v0.0.8"
 
 func PrintVersion() {
 	fmt.Printf("Current pvreplace version %s\n", version)

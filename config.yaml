@@ -1,0 +1,29 @@
+configurations:
+  - fuzzing-part: param-value
+    fuzzing-type: replace
+    fuzzing-mode: single
+
+  - fuzzing-part: param-name
+    fuzzing-type: replace
+    fuzzing-mode: multiple
+
+  - fuzzing-part: path-suffix
+    fuzzing-type: postfix
+    fuzzing-mode: multiple
+
+  - fuzzing-part: path-suffix-slash
+    fuzzing-type: replace
+    fuzzing-mode: multiple
+
+  - fuzzing-part: path-segment
+    fuzzing-type: postfix
+    fuzzing-mode: multiple
+
+  - fuzzing-part: path-ext
+    fuzzing-type: replace
+    fuzzing-mode: multiple
+
+  - fuzzing-part: headers
+    fuzzing-type: replace
+    fuzzing-mode: multiple
+    ignore: true
